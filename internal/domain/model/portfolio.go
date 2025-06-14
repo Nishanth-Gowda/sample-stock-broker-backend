@@ -13,12 +13,15 @@ type Holding struct {
 
 // OrderBookEntry represents an order with PNL.
 type OrderBookEntry struct {
-	Symbol        string  `json:"symbol"`
-	Quantity      float64 `json:"quantity"`
-	Side          string  `json:"side"` // BUY or SELL
-	Price         float64 `json:"price"`
-	UnrealizedPNL float64 `json:"unrealized_pnl"`
-	RealizedPNL   float64 `json:"realized_pnl"`
+	ID            int64   `json:"id" db:"id"`
+	UserID        int64   `json:"user_id" db:"user_id"`
+	Symbol        string  `json:"symbol" db:"symbol"`
+	Quantity      float64 `json:"quantity" db:"quantity"`
+	Side          string  `json:"side" db:"side"` // BUY or SELL
+	Price         float64 `json:"price" db:"price"`
+	UnrealizedPNL float64 `json:"unrealized_pnl" db:"unrealized_pnl"`
+	RealizedPNL   float64 `json:"realized_pnl" db:"realized_pnl"`
+	CreatedAt     string  `json:"created_at" db:"created_at"`
 }
 
 // Position represents an open position with PNL card.

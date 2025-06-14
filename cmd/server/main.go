@@ -83,16 +83,19 @@ func main() {
 	userRepo := mysqlRepo.NewUserRepository(db)
 	holdingRepo := mysqlRepo.NewHoldingRepository(db)
 	positionRepo := mysqlRepo.NewPositionRepository(db)
+	orderRepo := mysqlRepo.NewOrderBookRepository(db)
 	jwtManager := auth.NewJWTManager(secret)
 	passwordHasher := auth.NewPasswordHasher(0)
 	authSvc := services.NewAuthUsecase(userRepo, jwtManager, passwordHasher)
 	holdingSvc := services.NewHoldingService(holdingRepo)
 	positionSvc := services.NewPositionService(positionRepo)
+	orderSvc := services.NewOrderBookService(orderRepo)
 
 	// Handlers.
 	authHandler := handlers.NewAuthHandler(authSvc)
 	holdingHandler := handlers.NewHoldingHandler(holdingSvc)
 	positionHandler := handlers.NewPositionHandler(positionSvc)
+	orderHandler := handlers.NewOrderBookHandler(orderSvc)
 
 	// Router.
 	r := chi.NewRouter()
@@ -109,6 +112,8 @@ func main() {
 		protected.Get("/holdings", holdingHandler.List)
 		protected.Post("/positions/create", positionHandler.Create)
 		protected.Get("/positions", positionHandler.List)
+		protected.Post("/orderbook/create", orderHandler.Create)
+		protected.Get("/orderbook", orderHandler.List)
 	})
 
 	addr := ":8080"
