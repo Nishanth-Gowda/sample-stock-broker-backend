@@ -7,7 +7,7 @@ Features authentication with JWT, MySQL persistence, versioned migrations, and O
 
 ## ✨ Features
 
-* Clean Architecture layers (domain → services → handlers → infra).
+* Clean Architecture layers (handlers → services → domain ← infra).
 * MySQL storage via `sqlx`.
 * Database migrations with **golang-migrate** (auto-run on boot).
 * Secure password hashing (bcrypt) & JWT auth (chi jwtauth).
