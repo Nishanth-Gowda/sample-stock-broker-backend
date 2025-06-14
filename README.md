@@ -16,7 +16,6 @@ Features authentication with JWT, MySQL persistence, versioned migrations, and O
   * Holdings
   * Positions
 * `.env` configuration (loaded with **godotenv**).  `.env` is in `.gitignore`.
-* OpenAPI 3 specification (`openapi.yaml`).
 * Extensive logging in service layer.
 
 ---
