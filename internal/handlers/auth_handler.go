@@ -1,17 +1,17 @@
-package handler
+package handlers
 
 import (
-	"broker-backend/internal/usecase"
+	"broker-backend/internal/services"
 	"encoding/json"
 	"net/http"
 )
 
 type AuthHandler struct {
-	uc usecase.AuthUsecase
+	svc services.AuthUsecase
 }
 
-func NewAuthHandler(uc usecase.AuthUsecase) *AuthHandler {
-	return &AuthHandler{uc: uc}
+func NewAuthHandler(svc services.AuthUsecase) *AuthHandler {
+	return &AuthHandler{svc: svc}
 }
 
 type signupRequest struct {
@@ -29,7 +29,7 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	user, err := h.uc.SignUp(r.Context(), req.Email, req.Password)
+	user, err := h.svc.SignUp(r.Context(), req.Email, req.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -44,7 +44,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	token, err := h.uc.Login(r.Context(), req.Email, req.Password)
+	token, err := h.svc.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return

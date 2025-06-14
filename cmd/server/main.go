@@ -1,19 +1,23 @@
 package main
 
 import (
-	"broker-backend/internal/infra/repository/mysql"
-	httpHandler "broker-backend/internal/interface/http"
-	"broker-backend/internal/usecase"
+	handlers "broker-backend/internal/handlers"
+	mysqlRepo "broker-backend/internal/infra/repository/mysql"
+	"broker-backend/internal/services"
 	"broker-backend/pkg/auth"
 	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang-migrate/migrate/v4"
+	migrateMysql "github.com/golang-migrate/migrate/v4/database/mysql"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 )
@@ -51,23 +55,44 @@ func main() {
 	// Connect to DB.
 	db, err := sqlx.Connect("mysql", dsn)
 	if err != nil {
+		if strings.Contains(err.Error(), "Unknown database") {
+			rootDSN := fmt.Sprintf("%s:%s@tcp(%s:%s)/?parseTime=true", dbUser, dbPass, dbHost, dbPort)
+			tmp, terr := sqlx.Connect("mysql", rootDSN)
+			if terr != nil {
+				log.Fatalf("db connect root: %v", terr)
+			}
+			_, cerr := tmp.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
+			tmp.Close()
+			if cerr != nil {
+				log.Fatalf("create database: %v", cerr)
+			}
+			db, err = sqlx.Connect("mysql", dsn)
+		}
+	}
+	if err != nil {
 		log.Fatalf("db connect: %v", err)
 	}
 	defer db.Close()
 
-	if err := ensureSchema(db.DB); err != nil {
-		log.Fatalf("schema: %v", err)
+	// Run database migrations
+	if err := runMigrations(db.DB); err != nil {
+		log.Fatalf("migrations: %v", err)
 	}
 
 	// Wiring dependencies.
-	userRepo := mysql.NewUserRepository(db)
+	userRepo := mysqlRepo.NewUserRepository(db)
+	holdingRepo := mysqlRepo.NewHoldingRepository(db)
+	positionRepo := mysqlRepo.NewPositionRepository(db)
 	jwtManager := auth.NewJWTManager(secret)
 	passwordHasher := auth.NewPasswordHasher(0)
-	authUC := usecase.NewAuthUsecase(userRepo, jwtManager, passwordHasher)
+	authSvc := services.NewAuthUsecase(userRepo, jwtManager, passwordHasher)
+	holdingSvc := services.NewHoldingService(holdingRepo)
+	positionSvc := services.NewPositionService(positionRepo)
 
 	// Handlers.
-	authHandler := httpHandler.NewAuthHandler(authUC)
-	dataHandler := httpHandler.NewDataHandler()
+	authHandler := handlers.NewAuthHandler(authSvc)
+	holdingHandler := handlers.NewHoldingHandler(holdingSvc)
+	positionHandler := handlers.NewPositionHandler(positionSvc)
 
 	// Router.
 	r := chi.NewRouter()
@@ -80,9 +105,10 @@ func main() {
 	r.Group(func(protected chi.Router) {
 		protected.Use(jwtauth.Verifier(jwtAuth))
 		protected.Use(jwtauth.Authenticator)
-		protected.Get("/holdings", dataHandler.Holdings)
-		protected.Get("/orderbook", dataHandler.OrderBook)
-		protected.Get("/positions", dataHandler.Positions)
+		protected.Post("/holdings/create", holdingHandler.Create)
+		protected.Get("/holdings", holdingHandler.List)
+		protected.Post("/positions/create", positionHandler.Create)
+		protected.Get("/positions", positionHandler.List)
 	})
 
 	addr := ":8080"
@@ -90,14 +116,22 @@ func main() {
 	log.Fatal(http.ListenAndServe(addr, r))
 }
 
-// ensureSchema creates minimal users table when not exists.
-func ensureSchema(db *sql.DB) error {
-	query := `CREATE TABLE IF NOT EXISTS users (
-		id BIGINT AUTO_INCREMENT PRIMARY KEY,
-		email VARCHAR(255) UNIQUE NOT NULL,
-		password_hash VARCHAR(255) NOT NULL,
-		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-	)`
-	_, err := db.Exec(query)
-	return err
+// runMigrations applies all up migrations using golang-migrate.
+func runMigrations(db *sql.DB) error {
+	driver, err := migrateMysql.WithInstance(db, &migrateMysql.Config{})
+	if err != nil {
+		return err
+	}
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"mysql",
+		driver,
+	)
+	if err != nil {
+		return err
+	}
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+	return nil
 }

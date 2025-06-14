@@ -1,0 +1,24 @@
+# Go build artifacts
+/bin/
+/pkg/
+*.exe
+*.test
+*.out
+
+# IDE/editor directories
+.vscode/
+.idea/
+*.swp
+
+# Dependency directories
+vendor/
+
+# Environment & config
+.env
+*.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store 

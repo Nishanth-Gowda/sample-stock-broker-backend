@@ -1,4 +1,4 @@
-package usecase
+package services
 
 import (
 	"broker-backend/internal/domain/model"
@@ -6,15 +6,15 @@ import (
 	"broker-backend/pkg/auth"
 	"context"
 	"errors"
+	"log"
 	"time"
 )
 
 type AuthUsecase interface {
 	SignUp(ctx context.Context, email, password string) (*model.User, error)
-	Login(ctx context.Context, email, password string) (string, error) // returns JWT token
+	Login(ctx context.Context, email, password string) (string, error)
 }
 
-// authUsecase implements AuthUsecase following Clean Architecture.
 type authUsecase struct {
 	repo repository.UserRepository
 	jwt  auth.JWTManager
@@ -26,7 +26,6 @@ func NewAuthUsecase(repo repository.UserRepository, jwt auth.JWTManager, pwd aut
 }
 
 func (u *authUsecase) SignUp(ctx context.Context, email, password string) (*model.User, error) {
-	// Check if user exists.
 	if existing, _ := u.repo.FindByEmail(email); existing != nil {
 		return nil, errors.New("email already registered")
 	}
@@ -42,8 +41,10 @@ func (u *authUsecase) SignUp(ctx context.Context, email, password string) (*mode
 		CreatedAt: time.Now().UTC(),
 	}
 	if err := u.repo.Create(user); err != nil {
+		log.Printf("auth_service: failed to create user %s: %v", email, err)
 		return nil, err
 	}
+	log.Printf("auth_service: user %d signed up", user.ID)
 	return user, nil
 }
 
@@ -56,5 +57,11 @@ func (u *authUsecase) Login(ctx context.Context, email, password string) (string
 	if err := u.pwd.Verify(user.Password, password); err != nil {
 		return "", errors.New("invalid credentials")
 	}
-	return u.jwt.Generate(user.ID)
+	token, err := u.jwt.Generate(user.ID)
+	if err != nil {
+		log.Printf("auth_service: failed to generate token for user %d: %v", user.ID, err)
+		return "", err
+	}
+	log.Printf("auth_service: user %d logged in", user.ID)
+	return token, nil
 }
